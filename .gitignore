@@ -3,3 +3,4 @@
 start
 modd.conf
 pkged.go
+dist/
