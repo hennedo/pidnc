@@ -50,7 +50,8 @@ func main() {
 	db = database.InitDatabase(config.Config.GCodeFolder)
 	file.SyncFiles()
 	file.RenderAll()
-	serial.InitSerial(config.Config.SerialPort)
+	p := serial.InitSerial(config.Config.SerialPort)
+	defer p.Close()
 
 	r := mux.NewRouter()
 	r.HandleFunc("/api/files", ApiFilesHandler).Methods("GET")

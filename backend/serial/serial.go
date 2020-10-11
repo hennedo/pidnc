@@ -8,7 +8,7 @@ import (
 
 var port serial.Port
 
-func InitSerial(path string) {
+func InitSerial(path string) serial.Port {
 	mode := &serial.Mode{
 		BaudRate: 115200,
 		DataBits: 7,
@@ -20,8 +20,9 @@ func InitSerial(path string) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer port.Close()
 	go ReadSerial()
+
+	return port
 }
 
 func Write(data []byte) (int, error) {
