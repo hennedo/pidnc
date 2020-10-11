@@ -89,3 +89,17 @@ steps:
     status:
     - success
     - failure
+    -
+- name: Notify Pascal Telegram
+  image: appleboy/drone-telegram
+  settings:
+    token:
+      from_secret: telegram_token
+    to: 137934255
+    message: >
+      {{#success build.status}}
+        Neuer Build: https://r.dre.li/henne/pidnc/releases/${DRONE_TAG}
+      {{/success}}
+  when:
+    status:
+      - success
