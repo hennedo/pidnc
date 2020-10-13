@@ -5,6 +5,9 @@ name: default
 trigger:
   branch:
     - master
+    - alpha
+    - beta
+    - rc
 
 steps:
 - name: Build VueJS
