@@ -3,23 +3,22 @@ kind: pipeline
 type: docker
 name: default
 trigger:
-  event:
-    - tag
+  branch:
+    - master
 
 steps:
 - name: Build VueJS
   image: node
   commands:
-  - cd frontend
-  - npm install
-  - npm run build
-
+    - cd frontend
+    - npm install
+    - npm run build
 - name: Package static files
   image: golang
-  commangs:
-  - cd backend
-  - go get github.com/markbates/pkger/cmd/pkger
-  - pkger -include /static -include /templates
+  commands:
+    - cd backend
+    - go get github.com/markbates/pkger/cmd/pkger
+    - pkger -include /static -include /templates
 
 - name: Buiding for Linux
   image: golang
@@ -28,8 +27,8 @@ steps:
     GOARCH: amd64
     CGO_ENABLE: 1
   commands:
-  - cd backend
-  - go build -v -o dist/pidnc-linux-amd64
+    - cd backend
+    - go build -v -o dist/pidnc-linux-amd64
 
 - name: Building for ARM
   image: henne/golang-crosscompile
@@ -41,8 +40,8 @@ steps:
     CC: arm-linux-gnueabihf-gcc
     CXX: arm-linux-gnueabihf-g++
   commands:
-  - cd backend
-  - go build -v -o dist/pidnc-linux-arm5
+    - cd backend
+    - go build -v -o dist/pidnc-linux-arm5
 
 - name: Building for ARM64
   image: henne/golang-crosscompile
@@ -53,23 +52,33 @@ steps:
     CC: aarch64-linux-gnu-gcc
     CXX: aarch64-linux-gnu-g++
   commands:
-  - cd backend
-  - go build -v -o dist/pidnc-linux-arm64
+    - cd backend
+    - go build -v -o dist/pidnc-linux-arm64
 
+- name: Creating checksums
+  image: golang
+  commands:
+    - mkdir sums
+    - md5sum backend/dist/* > sums/md5sum.txt
+    - sha1sum backend/dist/* > sums/sha1sum.txt
+    - sha256sum backend/dist/* > sums/sha256sum.txt
+    - sha512sum backend/dist/* > sums/sha512sum.txt
+    - mv sums/* backend/dist/
+    - rmdir sums
 
-- name: Upload builds to release
-  image: plugins/gitea-release
+- name: semantic-release
+  image: henne/semantic-release
   settings:
-    api_key:
-      from_secret: gitea_key
-    base_url: https://r.dre.li
-    files: backend/dist/*
-    title: ${DRONE_TAG}
-    checksum:
-      - md5
-      - sha1
-      - sha256
-      - sha512
+    mode: release
+    git_user_name: drone
+    git_user_email: drone@example.com
+    git_login: henne
+    git_password:
+      from_secret: gitea_password
+  environment:
+    GITEA_TOKEN:
+      from_secret: gitea_token
+    GITEA_URL: https://r.dre.li
 
 - name: Notify Telegram
   image: appleboy/drone-telegram
@@ -89,7 +98,6 @@ steps:
     status:
     - success
     - failure
-    -
 - name: Notify Pascal Telegram
   image: appleboy/drone-telegram
   settings:
@@ -98,7 +106,7 @@ steps:
     to: 137934255
     message: >
       {{#success build.status}}
-        Neuer Build: https://r.dre.li/henne/pidnc/releases/${DRONE_TAG}
+        Neuer Build: https://r.dre.li/henne/pidnc/releases/
       {{/success}}
   when:
     status:

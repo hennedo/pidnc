@@ -1,0 +1,50 @@
+{
+  "branches": [
+    "master",
+    {
+      "name": "alpha",
+      "prerelease": true
+    },
+    {
+      "name": "beta",
+      "prerelease": true
+    },
+    {
+      "name": "rc",
+      "prerelease": true
+    }
+  ],
+  "verifyConditions": [
+    "@semantic-release/changelog",
+    "@semantic-release/git",
+    "@saithodev/semantic-release-gitea"
+  ],
+  "prepare": [
+    "@semantic-release/changelog",
+    {
+      "path": "@semantic-release/exec",
+      "cmd": "echo -n \"${nextRelease.version}\" > .release-version"
+    },
+    {
+      "path": "@semantic-release/git",
+      "assets": [
+        "CHANGELOG.md"
+      ],
+      "message": "release: ${nextRelease.version} [ci skip]"
+    }
+  ],
+  "publish": [
+    ["@saithodev/semantic-release-gitea", {
+      "assets": "backend/dist"
+    }]
+  ],
+  "success": false,
+  "fail": false,
+  "plugins": [
+    "@semantic-release/commit-analyzer",
+    "@semantic-release/release-notes-generator",
+    ["@saithodev/semantic-release-gitea", {
+    	"giteaUrl": "https://r.dre.li"
+    }]
+  ]
+}
