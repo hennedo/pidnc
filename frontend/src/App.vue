@@ -6,7 +6,6 @@
         <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarsExampleDefault" aria-controls="navbarsExampleDefault" aria-expanded="false" aria-label="Toggle navigation">
           <span class="navbar-toggler-icon"></span>
         </button>
-
         <div class="collapse navbar-collapse" id="navbarsExampleDefault">
           <ul class="navbar-nav ml-auto mb-2 mb-md-0">
             <li class="nav-item">
@@ -39,16 +38,19 @@
       </div>
     </nav>
     <Home></Home>
+    <IP></IP>
   </div>
 </template>
 
 <script>
 import Home from './components/Home.vue'
+import IP from './components/IP.vue'
 import store from './store'
 export default {
   name: 'App',
   components: {
-    Home
+    Home,
+    IP
   },
   methods: {
     uploadFile() {

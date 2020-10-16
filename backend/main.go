@@ -25,6 +25,15 @@ import (
 
 var db *gorm.DB
 
+type Info struct {
+	Interfaces []Interface `json:"interfaces"`
+}
+
+type Interface struct {
+	Name string `json:"name"`
+	IP   []string `json:"ip"`
+}
+
 func main() {
 	logrus.SetLevel(logrus.TraceLevel)
 	logrus.SetFormatter(&logrus.TextFormatter{
@@ -68,8 +77,11 @@ func main() {
 	logrus.Fatal(http.ListenAndServe(fmt.Sprintf("%s:%d", config.Config.Host, config.Config.Port), nil))
 }
 
+
+
 func ApiInfoHandler(w http.ResponseWriter, r *http.Request) {
 	ifaces, err := net.Interfaces()
+	info := Info{}
 	if err != nil {
 		fmt.Print(fmt.Errorf("localAddresses: %+v\n", err.Error()))
 		return
@@ -80,6 +92,7 @@ func ApiInfoHandler(w http.ResponseWriter, r *http.Request) {
 			fmt.Print(fmt.Errorf("localAddresses: %+v\n", err.Error()))
 			continue
 		}
+		var ips []string
 		for _, a := range addrs {
 			switch a.(type) {
 			case *net.IPNet:
@@ -87,11 +100,17 @@ func ApiInfoHandler(w http.ResponseWriter, r *http.Request) {
 				if ip == nil || ip.IsLoopback() {
 					continue
 				}
-				fmt.Printf("%v : %s\n", i.Name, ip)
+				ips = append(ips, ip.String())
 			}
-
+		}
+		if len(ips)>=1 {
+			info.Interfaces = append(info.Interfaces, Interface{
+				Name: i.Name,
+				IP:   ips,
+			})
 		}
 	}
+	json.NewEncoder(w).Encode(info)
 }
 
 func ApiFilesHandler(w http.ResponseWriter, r *http.Request) {

@@ -16,7 +16,22 @@ module.exports = {
                     "target": "http://localhost:8000",
                     "secure": false,
                     "changeOrigin": true
-                }
+                },
+                "/js/popper.min.js": {
+                    "target": "http://localhost:8000",
+                    "secure": false,
+                    "changeOrigin": true
+                },
+                "/js/bootstrap.min.js": {
+                    "target": "http://localhost:8000",
+                    "secure": false,
+                    "changeOrigin": true
+                },
+                "/css/bootstrap.min.css": {
+                    "target": "http://localhost:8000",
+                    "secure": false,
+                    "changeOrigin": true
+                },
             }
         }
     }
