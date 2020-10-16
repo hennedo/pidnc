@@ -80,7 +80,7 @@ steps:
       from_secret: gitea_password
   environment:
     GITEA_TOKEN:
-      from_secret: gitea_token
+      from_secret: gitea_key
     GITEA_URL: https://r.dre.li
 
 - name: Notify Telegram
