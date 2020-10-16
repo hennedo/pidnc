@@ -69,6 +69,7 @@ func main() {
 	r.HandleFunc("/api/{id}/delete", ApiDeleteHandler).Methods("GET")
 	r.HandleFunc("/api/{id}/lock", ApiLockHandler).Methods("GET")
 	r.HandleFunc("/api/info", ApiInfoHandler).Methods("GET")
+	r.HandleFunc("/api/backup", ApiBackupHandler).Methods("GET")
 	r.PathPrefix("/svg").Handler(http.StripPrefix("/svg", http.FileServer(http.Dir(config.Config.GCodeFolder + "/svg"))))
 	r.PathPrefix("").Handler(http.FileServer(pkger.Dir("/static/")))
 	http.Handle("/", r)
@@ -78,6 +79,11 @@ func main() {
 }
 
 
+func ApiBackupHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Disposition", "attachment; filename="+"backup.zip")
+	w.Header().Set("Content-Type", "application/zip")
+	file.Backup(w)
+}
 
 func ApiInfoHandler(w http.ResponseWriter, r *http.Request) {
 	ifaces, err := net.Interfaces()

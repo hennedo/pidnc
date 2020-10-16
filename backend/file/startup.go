@@ -1,9 +1,12 @@
 package file
 
 import (
+	"archive/zip"
 	"fmt"
+	"github.com/hennedo/godnc/config"
 	"github.com/hennedo/godnc/database"
 	"github.com/sirupsen/logrus"
+	"io"
 	"os"
 	"path/filepath"
 )
@@ -73,4 +76,40 @@ func SyncFiles() {
 		}
 		return nil
 	})
+}
+
+func Backup(w io.Writer) {
+	path := config.Config.GCodeFolder
+	zipWriter := zip.NewWriter(w)
+	defer zipWriter.Close()
+	_ = filepath.Walk(path + "/uploaded", zipFile(zipWriter, "uploaded"))
+	_ = filepath.Walk(path + "/machined", zipFile(zipWriter, "machined"))
+	_ = filepath.Walk(path + "/locked", zipFile(zipWriter, "locked"))
+}
+
+func zipFile(zipWriter *zip.Writer, subdir string) filepath.WalkFunc {
+	return func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			logrus.Fatal("error walking locked dir", err)
+		}
+		if info.IsDir() {
+			return nil
+		}
+		f, _ := os.Open(path)
+		defer f.Close()
+		header, err := zip.FileInfoHeader(info)
+		if err != nil {
+			logrus.Error(err)
+		}
+		header.Name = fmt.Sprintf("%s/%s", subdir, info.Name())
+		writer, err := zipWriter.CreateHeader(header)
+		if err != nil {
+			logrus.Error(err)
+		}
+		_, err = io.Copy(writer, f)
+		if err != nil {
+			logrus.Error(err)
+		}
+		return nil
+	}
 }
