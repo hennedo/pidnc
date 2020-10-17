@@ -2,7 +2,8 @@ import axios from "axios";
 
 export const namespaced = true
 export const state = {
-    files: []
+    files: [],
+    settings: {}
 }
 export const mutations = {
     SET_FILES(state, files) {

@@ -2,13 +2,24 @@ package serial
 
 import (
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"go.bug.st/serial"
-	"log"
 )
 
 var port serial.Port
+var readChannel chan bool
 
-func InitSerial(path string) serial.Port {
+func InitSerial(path string) (serial.Port, error) {
+	if port != nil {
+		err := port.Close()
+		if err != nil {
+			logrus.Error(err)
+		}
+		port = nil
+	}
+	if readChannel != nil {
+		readChannel = make(chan bool)
+	}
 	mode := &serial.Mode{
 		BaudRate: 115200,
 		DataBits: 7,
@@ -18,11 +29,12 @@ func InitSerial(path string) serial.Port {
 	var err error
 	port, err = serial.Open(path, mode)
 	if err != nil {
-		log.Fatal(err)
+		port = nil
+		return nil, err
 	}
-	go ReadSerial()
+	//go ReadSerial()
 
-	return port
+	return port, nil
 }
 
 func Write(data []byte) (int, error) {
@@ -32,11 +44,26 @@ func Write(data []byte) (int, error) {
 func ReadSerial() {
 	buff := make([]byte, 100)
 	for {
-		n, err := port.Read(buff)
-		if err != nil {
-			log.Fatal(err)
-			break
+		select {
+			case <- readChannel:
+				return
+			default:
+				n, err := port.Read(buff)
+				if err != nil {
+					logrus.Error(err)
+					break
+				}
+				fmt.Printf("%v", string(buff[:n]))
 		}
-		fmt.Printf("%v", string(buff[:n]))
 	}
+}
+
+func Close() {
+	if port != nil {
+		port.Close()
+	}
+}
+
+func GetPortsList() ([]string, error) {
+	return serial.GetPortsList()
 }

@@ -25,9 +25,6 @@ import (
 
 var db *gorm.DB
 
-type Info struct {
-	Interfaces []Interface `json:"interfaces"`
-}
 
 type Interface struct {
 	Name string `json:"name"`
@@ -43,24 +40,34 @@ func main() {
 	flag.Int("port", 8000, "Port where the shop listens on")
 	flag.String("host", "", "IP to bind to")
 	flag.String("gcode-folder", "", "Folder to store gcode in.")
-	flag.String("serial-port", "", "Serial Port Path")
 	_ = viper.BindPFlags(flag.CommandLine)
 	flag.Parse()
 	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
 	viper.AutomaticEnv()
+	viper.SetConfigName("config")
+	viper.SetConfigType("yaml")
+	viper.AddConfigPath(".")
 	config.Config = config.SConfig{
 		Port:           viper.GetInt("port"),
 		Host:           viper.GetString("host"),
 		GCodeFolder:    strings.TrimSuffix(viper.GetString("gcode-folder"), "/"),
-		SerialPort:    	viper.GetString("serial-port"),
 	}
-
+	viper.AddConfigPath(config.Config.GCodeFolder)
 	file.InitFolder(config.Config.GCodeFolder)
+	err := viper.ReadInConfig()
+	if _, ok := err.(viper.ConfigFileNotFoundError); ok {
+		logrus.Fatal("could not read config file")
+	}
+	config.Config.SerialPort = viper.GetString("serial-port")
+	viper.WriteConfigAs(config.Config.GCodeFolder + "/config.yaml")
 	db = database.InitDatabase(config.Config.GCodeFolder)
 	file.SyncFiles()
 	file.RenderAll()
-	p := serial.InitSerial(config.Config.SerialPort)
-	defer p.Close()
+	_, err = serial.InitSerial(config.Config.SerialPort)
+	if err != nil {
+		logrus.Error(err)
+	}
+	defer serial.Close()
 
 	r := mux.NewRouter()
 	r.HandleFunc("/api/files", ApiFilesHandler).Methods("GET")
@@ -68,7 +75,9 @@ func main() {
 	r.HandleFunc("/api/{id}/run", ApiRunHandler).Methods("GET")
 	r.HandleFunc("/api/{id}/delete", ApiDeleteHandler).Methods("GET")
 	r.HandleFunc("/api/{id}/lock", ApiLockHandler).Methods("GET")
-	r.HandleFunc("/api/info", ApiInfoHandler).Methods("GET")
+	r.HandleFunc("/api/settings", ApiSettingsHandler).Methods("GET")
+	r.HandleFunc("/api/settings", ApiSetSettingsHandler).Methods("POST")
+	r.HandleFunc("/api/serialPorts", ApiSerialPortsHandler).Methods("GET")
 	r.HandleFunc("/api/backup", ApiBackupHandler).Methods("GET")
 	r.PathPrefix("/svg").Handler(http.StripPrefix("/svg", http.FileServer(http.Dir(config.Config.GCodeFolder + "/svg"))))
 	r.PathPrefix("").Handler(http.FileServer(pkger.Dir("/static/")))
@@ -85,12 +94,67 @@ func ApiBackupHandler(w http.ResponseWriter, r *http.Request) {
 	file.Backup(w)
 }
 
-func ApiInfoHandler(w http.ResponseWriter, r *http.Request) {
+func ApiSetSettingsHandler(w http.ResponseWriter, r *http.Request) {
+	var settings config.SConfig
+	json.NewDecoder(r.Body).Decode(&settings)
+	if config.Config.SerialPort != settings.SerialPort {
+		ports, err := serial.GetPortsList()
+		if err != nil {
+			logrus.Error(err)
+			w.WriteHeader(500)
+			w.Write([]byte("Internal Server Error"))
+			return
+		}
+		changed := false
+		for _, port := range ports {
+			if port == settings.SerialPort {
+				changed = true
+				config.Config.SerialPort = settings.SerialPort
+				viper.Set("serial-port", settings.SerialPort)
+				viper.WriteConfigAs(config.Config.GCodeFolder + "/config.yaml")
+				_, err := serial.InitSerial(config.Config.SerialPort)
+				if err != nil {
+					logrus.Error(err)
+				}
+			}
+		}
+		if !changed {
+			w.WriteHeader(500)
+			w.Write([]byte("Serial Port not found"))
+			return
+		}
+	}
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"settings": config.Config,
+		"interfaces": getInterfaces(),
+	})
+}
+
+func ApiSerialPortsHandler(w http.ResponseWriter, r *http.Request) {
+	ports, err := serial.GetPortsList()
+	if err != nil {
+		logrus.Error(err)
+		w.WriteHeader(500)
+		w.Write([]byte("Internal Server Error"))
+		return
+	}
+	json.NewEncoder(w).Encode(ports)
+}
+
+func ApiSettingsHandler(w http.ResponseWriter, r *http.Request) {
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"interfaces": getInterfaces(),
+		"settings": config.Config,
+	})
+}
+
+func getInterfaces() []Interface {
 	ifaces, err := net.Interfaces()
-	info := Info{}
+	var interfaces []Interface
 	if err != nil {
 		fmt.Print(fmt.Errorf("localAddresses: %+v\n", err.Error()))
-		return
+		return nil
 	}
 	for _, i := range ifaces {
 		addrs, err := i.Addrs()
@@ -110,13 +174,13 @@ func ApiInfoHandler(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		if len(ips)>=1 {
-			info.Interfaces = append(info.Interfaces, Interface{
+			interfaces = append(interfaces, Interface{
 				Name: i.Name,
 				IP:   ips,
 			})
 		}
 	}
-	json.NewEncoder(w).Encode(info)
+	return interfaces
 }
 
 func ApiFilesHandler(w http.ResponseWriter, r *http.Request) {

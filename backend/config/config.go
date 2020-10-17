@@ -1,10 +1,10 @@
 package config
 
 type SConfig struct {
-	Port            int
-	Host            string
-	GCodeFolder     string
-	SerialPort		string
+	Port            int `json:"port"`
+	Host            string `json:"host"`
+	GCodeFolder     string `json:"gCodeFolder"`
+	SerialPort		string `json:"serialPort"`
 }
 
 var Config SConfig
