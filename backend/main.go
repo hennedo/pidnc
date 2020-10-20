@@ -55,7 +55,7 @@ func main() {
 	viper.AddConfigPath(config.Config.GCodeFolder)
 	file.InitFolder(config.Config.GCodeFolder)
 	err := viper.ReadInConfig()
-	if _, ok := err.(viper.ConfigFileNotFoundError); ok {
+	if _, ok := err.(viper.ConfigFileNotFoundError); err != nil && !ok {
 		logrus.Fatal("could not read config file")
 	}
 	config.Config.SerialPort = viper.GetString("serial-port")
