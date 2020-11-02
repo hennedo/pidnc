@@ -118,6 +118,7 @@ func ApiSetSettingsHandler(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		}
+
 		if !changed {
 			w.WriteHeader(500)
 			w.Write([]byte("Serial Port not found"))
