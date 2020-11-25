@@ -317,19 +317,23 @@ func ApiRunHandler(w http.ResponseWriter, r *http.Request) {
 	f, _ := os.Open(fmt.Sprintf("%s/%s/%s", config.Config.GCodeFolder, file.Type, file.Name))
 	stat, _ := f.Stat()
 	var pos int64 = 0
+	var oldPos int64 = 0
 	for {
-		logrus.Infof("%d %d", pos, stat.Size())
 		if pos >= stat.Size() {
 			break
 		}
 		buf := make([]byte, 10)
 		f.Read(buf)
-		n, err := serial.Write(buf)
+		_, err := serial.Write(buf)
 		if err != nil {
 			log.Fatal(err)
 		}
-		fmt.Printf("Sent %v bytes\n", n)
-		hub.Broadcast(fmt.Sprintf("{\"type\": \"gcode\", \"args\": %f}", float32(pos/stat.Size())*100))
+		if pos > oldPos+10000 {
+			msg := fmt.Sprintf("{\"type\": \"gcode\", \"args\": %.2f}", float32(pos)/float32(stat.Size())*100)
+			logrus.Info(msg)
+			hub.Broadcast(msg)
+			oldPos = pos
+		}
 		pos += 10
 	}
 	if file.Type == "uploaded" {
