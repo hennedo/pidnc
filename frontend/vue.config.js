@@ -7,6 +7,12 @@ module.exports = {
     configureWebpack: {
         devServer: {
             proxy: {
+                "/ws": {
+                    "target": "ws://localhost:8000",
+                    "ws": true,
+                    "secure": false,
+                    "changeOrigin": true
+                },
                 "/api": {
                     "target": "http://localhost:8000",
                     "secure": false,

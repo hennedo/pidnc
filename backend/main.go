@@ -9,6 +9,7 @@ import (
 	"github.com/hennedo/godnc/database"
 	"github.com/hennedo/godnc/file"
 	"github.com/hennedo/godnc/serial"
+	"github.com/hennedo/godnc/websockets"
 	"github.com/markbates/pkger"
 	"github.com/sirupsen/logrus"
 	flag "github.com/spf13/pflag"
@@ -23,19 +24,20 @@ import (
 	"strings"
 )
 
+var hub *websockets.Hub
 var db *gorm.DB
-
+var sendingGCode bool
 
 type Interface struct {
-	Name string `json:"name"`
+	Name string   `json:"name"`
 	IP   []string `json:"ip"`
 }
 
 func main() {
 	logrus.SetLevel(logrus.TraceLevel)
 	logrus.SetFormatter(&logrus.TextFormatter{
-		ForceColors:               true,
-		FullTimestamp:             true,
+		ForceColors:   true,
+		FullTimestamp: true,
 	})
 	flag.Int("port", 8000, "Port where the shop listens on")
 	flag.String("host", "", "IP to bind to")
@@ -48,9 +50,9 @@ func main() {
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath(".")
 	config.Config = config.SConfig{
-		Port:           viper.GetInt("port"),
-		Host:           viper.GetString("host"),
-		GCodeFolder:    strings.TrimSuffix(viper.GetString("gcode-folder"), "/"),
+		Port:        viper.GetInt("port"),
+		Host:        viper.GetString("host"),
+		GCodeFolder: strings.TrimSuffix(viper.GetString("gcode-folder"), "/"),
 	}
 	viper.AddConfigPath(config.Config.GCodeFolder)
 	file.InitFolder(config.Config.GCodeFolder)
@@ -68,8 +70,14 @@ func main() {
 		logrus.Error(err)
 	}
 	defer serial.Close()
+	sendingGCode = false
+	hub = websockets.NewHub()
 
+	hub.On("files", func(client *websockets.Client, s string) {
+		BroadcastFiles()
+	})
 	r := mux.NewRouter()
+	r.HandleFunc("/ws", hub.ServeWs)
 	r.HandleFunc("/api/files", ApiFilesHandler).Methods("GET")
 	r.HandleFunc("/api/upload", ApiUploadHandler).Methods("POST")
 	r.HandleFunc("/api/{id}/run", ApiRunHandler).Methods("GET")
@@ -79,14 +87,13 @@ func main() {
 	r.HandleFunc("/api/settings", ApiSetSettingsHandler).Methods("POST")
 	r.HandleFunc("/api/serialPorts", ApiSerialPortsHandler).Methods("GET")
 	r.HandleFunc("/api/backup", ApiBackupHandler).Methods("GET")
-	r.PathPrefix("/svg").Handler(http.StripPrefix("/svg", http.FileServer(http.Dir(config.Config.GCodeFolder + "/svg"))))
+	r.PathPrefix("/svg").Handler(http.StripPrefix("/svg", http.FileServer(http.Dir(config.Config.GCodeFolder+"/svg"))))
 	r.PathPrefix("").Handler(http.FileServer(pkger.Dir("/static/")))
 	http.Handle("/", r)
 
 	logrus.Info(fmt.Sprintf("Listening on %s:%d", config.Config.Host, config.Config.Port))
 	logrus.Fatal(http.ListenAndServe(fmt.Sprintf("%s:%d", config.Config.Host, config.Config.Port), nil))
 }
-
 
 func ApiBackupHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Disposition", "attachment; filename="+"backup.zip")
@@ -126,7 +133,7 @@ func ApiSetSettingsHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"settings": config.Config,
+		"settings":   config.Config,
 		"interfaces": getInterfaces(),
 	})
 }
@@ -146,7 +153,7 @@ func ApiSettingsHandler(w http.ResponseWriter, r *http.Request) {
 
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"interfaces": getInterfaces(),
-		"settings": config.Config,
+		"settings":   config.Config,
 	})
 }
 
@@ -174,7 +181,7 @@ func getInterfaces() []Interface {
 				ips = append(ips, ip.String())
 			}
 		}
-		if len(ips)>=1 {
+		if len(ips) >= 1 {
 			interfaces = append(interfaces, Interface{
 				Name: i.Name,
 				IP:   ips,
@@ -222,6 +229,7 @@ func ApiDeleteHandler(w http.ResponseWriter, r *http.Request) {
 	os.Remove(fmt.Sprintf("%s/svg/%d.svg", config.Config.GCodeFolder, file.ID))
 	db.Delete(&file)
 	w.Write([]byte("file deleted"))
+	BroadcastFiles()
 }
 
 func ApiLockHandler(w http.ResponseWriter, r *http.Request) {
@@ -253,6 +261,7 @@ func ApiLockHandler(w http.ResponseWriter, r *http.Request) {
 	file.Type = "locked"
 	db.Save(&file)
 	w.Write([]byte("file locked"))
+	BroadcastFiles()
 }
 
 func ApiUploadHandler(w http.ResponseWriter, r *http.Request) {
@@ -271,16 +280,33 @@ func ApiUploadHandler(w http.ResponseWriter, r *http.Request) {
 	defer f.Close()
 	io.Copy(f, upload)
 	var dbFile = database.File{
-		Type:  "uploaded",
-		Name:  handler.Filename,
-		Size:  handler.Size,
+		Type: "uploaded",
+		Name: handler.Filename,
+		Size: handler.Size,
 	}
 	db.Create(&dbFile)
 	file.RenderFile(dbFile)
+	BroadcastFiles()
 	json.NewEncoder(w).Encode(dbFile)
 }
 
+func BroadcastFiles() {
+	var files []database.File
+	err := db.Find(&files, database.File{}).Error
+	if err != nil {
+		logrus.Error(err)
+	}
+	hub.BroadcastJSON("files", files)
+}
 func ApiRunHandler(w http.ResponseWriter, r *http.Request) {
+	if sendingGCode {
+		w.Write([]byte("{\"error\":\"already sending gcode\"}"))
+		return
+	}
+	defer func() {
+		sendingGCode = false
+	}()
+	sendingGCode = true
 	params := mux.Vars(r)
 	var file database.File
 	err := db.Find(&file, params["id"]).Error
@@ -303,12 +329,15 @@ func ApiRunHandler(w http.ResponseWriter, r *http.Request) {
 			log.Fatal(err)
 		}
 		fmt.Printf("Sent %v bytes\n", n)
+		hub.Broadcast(fmt.Sprintf("{\"type\": \"gcode\", \"args\": %f}", float32(pos/stat.Size())*100))
 		pos += 10
 	}
 	if file.Type == "uploaded" {
 		file.Type = "machined"
 		os.Rename(fmt.Sprintf("%s/uploaded/%s", config.Config.GCodeFolder, file.Name), fmt.Sprintf("%s/machined/%s", config.Config.GCodeFolder, file.Name))
 		db.Save(&file)
+		BroadcastFiles()
+		hub.Broadcast("{\"type\": \"gcode\", \"args\": 0}")
 	}
 	http.Redirect(w, r, "/", 302)
 }

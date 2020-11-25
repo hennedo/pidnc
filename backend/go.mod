@@ -7,6 +7,7 @@ replace github.com/256dpi/gcode => github.com/hennedo/gcode v0.4.0
 require (
 	github.com/256dpi/gcode v0.2.0
 	github.com/gorilla/mux v1.8.0
+	github.com/gorilla/websocket v1.4.2
 	github.com/markbates/pkger v0.17.1
 	github.com/sirupsen/logrus v1.6.0
 	github.com/spf13/pflag v1.0.5

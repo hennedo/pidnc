@@ -5,7 +5,10 @@ export const state = {
     files: [],
     settings: {},
     upload: {
-        progress: 0,
+        progress: 0
+    },
+    gcode: {
+        progress: 0
     }
 }
 export const mutations = {
@@ -38,6 +41,10 @@ export const actions = {
             return []
         })
     },
+    setAll({ commit }, { data }) {
+        console.log(data)
+        commit('SET_FILES', data)
+    },
     remove({ commit, state }, { id }) {
         axios.get(`/api/${id}/delete`).then(() => {
             for(let i = 0; i < state.files.length; i++) {
@@ -64,9 +71,8 @@ export const actions = {
                     commit('UPDATE_UPLOAD', {progress: Math.round(e.loaded/e.total*1000)/100})
                 }
             }
-        ).then( response => {
+        ).then( () => {
             commit('UPDATE_UPLOAD', 0, "")
-            commit('ADD_FILE', response.data)
         })
         .catch(function(){
             console.log('FAILURE!!');
