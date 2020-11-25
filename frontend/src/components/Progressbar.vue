@@ -12,7 +12,6 @@ export default {
   name: 'Progressbar',
   props: {
     progress: Number,
-    text: String,
   }
 }
 </script>
