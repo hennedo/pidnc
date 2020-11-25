@@ -1,3 +1,18 @@
+# [1.0.0-alpha.3](https://r.dre.li/henne/pidnc/compare/v1.0.0-alpha.2...v1.0.0-alpha.3) (2020-11-25)
+
+
+### Bug Fixes
+
+* add websocket modules to git... ([c09a0f5](https://r.dre.li/henne/pidnc/commit/c09a0f5612558c60d264b6b58ed8bdd8ca6499f7))
+* removed unused parameter from progressbar ([bac630a](https://r.dre.li/henne/pidnc/commit/bac630a8ac2c281626d6ff84c02f78cebfc187fe))
+
+
+### Features
+
+* Disable Buttons when sending gcode ([e5c2292](https://r.dre.li/henne/pidnc/commit/e5c22922bcc026021705c2157c226cea7a99da07))
+* Implemented Websockets, syncing state between browser windows ([f50df6d](https://r.dre.li/henne/pidnc/commit/f50df6da8ca23e4f1e4a7507b38c52e13ecb8c0e))
+* Upload Progressbar ([d20ad5c](https://r.dre.li/henne/pidnc/commit/d20ad5c10040bfdbd681e47a42bca515801168dd))
+
 # [1.0.0-alpha.2](https://r.dre.li/henne/pidnc/compare/v1.0.0-alpha.1...v1.0.0-alpha.2) (2020-11-02)
 
 
