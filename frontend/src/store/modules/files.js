@@ -3,7 +3,10 @@ import axios from "axios";
 export const namespaced = true
 export const state = {
     files: [],
-    settings: {}
+    settings: {},
+    upload: {
+        progress: 0,
+    }
 }
 export const mutations = {
     SET_FILES(state, files) {
@@ -14,6 +17,9 @@ export const mutations = {
     },
     REMOVE_FILE(state, index) {
         state.files.splice(index, 1)
+    },
+    UPDATE_UPLOAD(state, status) {
+        state.upload.progress = status.progress;
     }
 }
 export const actions = {
@@ -52,10 +58,14 @@ export const actions = {
             {
                 headers: {
                     'Content-Type': 'multipart/form-data'
+                },
+                onUploadProgress: function(e) {
+                    console.log(e.loaded, e.total)
+                    commit('UPDATE_UPLOAD', {progress: Math.round(e.loaded/e.total*1000)/100})
                 }
             }
         ).then( response => {
-            console.log(response.data)
+            commit('UPDATE_UPLOAD', 0, "")
             commit('ADD_FILE', response.data)
         })
         .catch(function(){

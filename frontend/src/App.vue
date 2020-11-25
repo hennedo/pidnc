@@ -41,13 +41,29 @@
       </div>
     </nav>
     <router-view></router-view>
+    <Progressbar v-if="upload.progress" :progress="upload.progress">Uploading...</Progressbar>
   </div>
 </template>
 
 <script>
 import store from './store'
+import Progressbar from "./components/Progressbar";
+import {mapState} from "vuex";
 export default {
   name: 'App',
+  data() {
+    return {
+      gcode: {
+        progress: 10
+      }
+    }
+  },
+  components: {
+    Progressbar
+  },
+  computed: {
+    ...mapState('files', ['upload'])
+  },
   methods: {
     uploadFile() {
       let file = this.$refs.file.files[0];
